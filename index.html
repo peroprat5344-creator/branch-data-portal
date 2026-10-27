@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Branch Reporting Portal - Target & Achievement</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -119,6 +122,25 @@
         </div>
       </div>
 
+      <!-- Backend Warning Banner if Google Script URL not set -->
+      <div id="configWarningBanner" class="hidden bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 text-amber-900 shadow-sm">
+        <div class="flex items-start space-x-3">
+          <div class="text-amber-600 text-xl mt-0.5">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div class="flex-1 text-xs sm:text-sm">
+            <div class="font-bold text-sm">महत्वपूर्ण सूचना: Google Sheet लिंक नहीं है!</div>
+            <p class="mt-0.5 text-slate-700">
+              दूसरे मोबाइलों/सिस्टमों से भरा गया डेटा एक जगह लाने के लिए अपनी Google Sheet का Web App URL सेट करें। 
+              <strong>Admin Portal ➔ Settings (⚙️)</strong> में जाकर या <strong>app.js</strong> में <code class="bg-amber-100 px-1 py-0.5 rounded font-mono">DEFAULT_GOOGLE_SCRIPT_URL</code> डालें।
+            </p>
+          </div>
+          <button onclick="switchView('admin'); openSettingsModal();" class="px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow whitespace-nowrap">
+            सेट करें (Setup)
+          </button>
+        </div>
+      </div>
+
       <!-- Main Form -->
       <form id="branchDataForm" onsubmit="handleBranchSubmit(event)" class="bg-white rounded-2xl shadow-md border border-slate-200/80 p-5 sm:p-8 space-y-6">
         
@@ -192,7 +214,7 @@
               <select id="schemeCategory" required onchange="handleCategoryChange()"
                 class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
                 <option value="">-- योजना चुनें --</option>
-                <option value="JLG (Joint Liability Group) Financing">JLG (Joint Liability Group) Financing</option>
+                <option value="CM YUVA">CM YUVA</option>
                 <option value="KCC (Kisan Credit Card) Fresh/Renewal">KCC (Kisan Credit Card) Fresh/Renewal</option>
                 <option value="SHG (Self Help Group) Linkage">SHG (Self Help Group) Linkage</option>
                 <option value="CASA / Current & Savings Deposits">CASA / Current & Savings Deposits</option>
@@ -439,7 +461,7 @@
             </div>
             <div>
               <h2 class="text-base sm:text-lg font-bold text-slate-800">Admin Control Center</h2>
-              <p class="text-xs text-slate-500">सभी शाखाओं की रिपोर्ट और डेटा विश्लेषण</p>
+              <div id="adminSyncStatus" class="text-xs text-slate-500 mt-0.5">सभी शाखाओं की रिपोर्ट और डेटा विश्लेषण</div>
             </div>
           </div>
 
@@ -753,7 +775,7 @@
     </div>
   </footer>
 
-  <!-- Application Logic JS -->
-  <script src="app.js"></script>
+  <!-- Application Logic JS with Cache Buster -->
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>
