@@ -1,20 +1,22 @@
 /**
- * Branch Reporting Portal - Core Application Logic
- * Supports Mobile & Desktop Browsers
- * Backend: Google Apps Script (Web App) + LocalStorage Fallback & SheetJS Excel Export
+ * =========================================================================
+ * 🏦 BRANCH REPORTING PORTAL - CORE APPLICATION LOGIC (v2.1)
+ * =========================================================================
+ * 
+ * 💡 महत्वपूर्ण: अपनी Google Sheet का Web App URL नीचे डालें।
+ * इसे डालते ही दुनिया के किसी भी कोने से भरा गया डेटा आपकी Google Sheet
+ * और एडमिन डैशबोर्ड दोनों में 100% लाइव दिखाई देने लगेगा।
+ * =========================================================================
  */
+
+// ⬇️ अपना Google Script Web App URL यहाँ डबल कोट्स ("") के अंदर पेस्ट करें ⬇️
+const DEFAULT_GOOGLE_SCRIPT_URL = ""; 
+const DEFAULT_SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1AHoaMG-iQtm0cCQ84qBM55NiipqaQaHc9ELPkrAi8G0/edit?usp=sharing"; 
 
 // Storage Keys
 const STORAGE_KEY_DATA = 'branch_portal_records';
 const STORAGE_KEY_SETTINGS = 'branch_portal_settings';
 const STORAGE_KEY_ADMIN_AUTH = 'branch_portal_admin_auth';
-
-// Default Settings
-const defaultSettings = {
-  adminPin: '1234',
-  googleScriptUrl: '',
-  googleSheetViewUrl: ''
-};
 
 // Global State
 let portalSettings = loadSettings();
@@ -29,7 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const dateInput = document.getElementById('reportingDate');
   if (dateInput) dateInput.value = today;
 
-  // Load records from LocalStorage
+  // Check backend configuration
+  checkBackendConfigBanner();
+
+  // Load records
   loadLocalRecords();
 
   // Check admin session
@@ -37,25 +42,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update backend status badge
   updateBackendBadge();
-
-  // Populate sample demo data if first time running
-  initDemoDataIfEmpty();
 });
 
-// Load Settings from LocalStorage
+// Load Settings
 function loadSettings() {
   const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
+  let settings = {
+    adminPin: '1234',
+    googleScriptUrl: DEFAULT_GOOGLE_SCRIPT_URL || '',
+    googleSheetViewUrl: DEFAULT_SHEET_VIEW_URL || ''
+  };
+
   if (saved) {
     try {
-      return { ...defaultSettings, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      settings = { ...settings, ...parsed };
     } catch (e) {
       console.error('Error parsing settings:', e);
     }
   }
-  return { ...defaultSettings };
+
+  // Hardcoded constants take precedence if defined in code
+  if (DEFAULT_GOOGLE_SCRIPT_URL) {
+    settings.googleScriptUrl = DEFAULT_GOOGLE_SCRIPT_URL;
+  }
+  if (DEFAULT_SHEET_VIEW_URL) {
+    settings.googleSheetViewUrl = DEFAULT_SHEET_VIEW_URL;
+  }
+
+  return settings;
 }
 
-// Save Settings
+// Check Backend Banner to guide user if URL is not configured
+function checkBackendConfigBanner() {
+  const banner = document.getElementById('configWarningBanner');
+  if (!banner) return;
+
+  if (!portalSettings.googleScriptUrl) {
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+// Save Settings from Admin Modal
 function saveSettings() {
   const scriptUrl = document.getElementById('googleScriptUrlInput').value.trim();
   const sheetViewUrl = document.getElementById('googleSheetViewUrlInput').value.trim();
@@ -72,10 +102,11 @@ function saveSettings() {
 
   localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(portalSettings));
   updateBackendBadge();
+  checkBackendConfigBanner();
   closeSettingsModal();
   showAlert('सफलता', 'सेटिंग्स सफलतापूर्वक सेव हो गई हैं!', 'success');
 
-  // If a script URL is provided, attempt to fetch live data
+  // Trigger live data reload
   if (scriptUrl) {
     loadAdminData();
   }
@@ -108,11 +139,11 @@ function updateBackendBadge() {
   const badge = document.getElementById('backendBadge');
   if (!badge) return;
   if (portalSettings.googleScriptUrl) {
-    badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Google Sheet Live`;
-    badge.className = 'hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300';
+    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Google Sheet Live`;
+    badge.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300';
   } else {
-    badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></span> Local + Cloud Ready`;
-    badge.className = 'hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200';
+    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span> Local Mode (Google Sheet Not Linked)`;
+    badge.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300';
   }
 }
 
@@ -187,7 +218,7 @@ function handleCategoryChange() {
   }
 }
 
-// Branch Form Submission
+// ==================== BRANCH FORM SUBMISSION ====================
 async function handleBranchSubmit(event) {
   event.preventDefault();
 
@@ -238,31 +269,32 @@ async function handleBranchSubmit(event) {
 
   // UI Loading State
   submitBtn.disabled = true;
-  submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>डेटा सेव हो रहा है...</span>`;
+  submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>डेटा Google Sheet में सेव हो रहा है...</span>`;
 
   try {
-    // 1. Send to Google Sheets if configured
+    // 1. Send to Google Sheets Web App
     if (portalSettings.googleScriptUrl) {
+      // Use text/plain with no-cors to prevent OPTIONS preflight blocking in browsers
       await fetch(portalSettings.googleScriptUrl, {
         method: 'POST',
-        mode: 'no-cors', // standard for Google Apps Script Web Apps
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(newRecord)
       });
     }
 
-    // 2. Save into LocalStorage for instant access & offline guarantee
-    allRecords.unshift(newRecord);
-    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(allRecords));
-
-    // 3. Update branch device history
+    // 2. Save into LocalStorage for current device acknowledgement
     currentDeviceSubmissions.unshift(newRecord);
     renderBranchHistory();
 
-    // 4. Show Acknowledgement Slip Modal
+    // Also update allRecords locally
+    allRecords.unshift(newRecord);
+    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(allRecords));
+
+    // 3. Show Acknowledgement Slip Modal
     showReceiptModal(newRecord);
 
-    // 5. Reset form (keep branch info for convenience)
+    // 4. Reset form (keep branch info for convenience)
     document.getElementById('schemeCategory').value = '';
     document.getElementById('targetAmount').value = '';
     document.getElementById('achievementAmount').value = '';
@@ -312,7 +344,7 @@ function renderBranchHistory() {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" class="text-center py-6 text-slate-400">
-          अभी तक कोई स्थानीय सबमिशन नहीं है। फॉर्म भरकर सबमिट करें।
+          अभी तक इस डिवाइस से कोई सबमिशन नहीं हुआ है। ऊपर फॉर्म भरकर सबमिट करें।
         </td>
       </tr>
     `;
@@ -393,21 +425,39 @@ function adminLogout() {
   showAlert('अलविदा', 'आप सफलतापूर्वक लॉगआउट हो गए हैं।', 'info');
 }
 
-// Load Records from Google Sheet or LocalStorage
+// Load Records LIVE from Google Sheet or LocalStorage
 async function loadAdminData() {
-  // If Google Script URL is provided, try fetching live data from Google Sheet
+  const syncStatus = document.getElementById('adminSyncStatus');
+  
   if (portalSettings.googleScriptUrl) {
+    if (syncStatus) {
+      syncStatus.innerHTML = `<span class="inline-flex items-center text-blue-600"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Google Sheet से लाइव डेटा लोड हो रहा है...</span>`;
+    }
+
     try {
-      const response = await fetch(portalSettings.googleScriptUrl);
+      // Add timestamp to prevent browser caching of Google Apps Script GET requests
+      const fetchUrl = portalSettings.googleScriptUrl + (portalSettings.googleScriptUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+      const response = await fetch(fetchUrl);
       const json = await response.json();
-      if (Array.isArray(json) && json.length > 0) {
+
+      if (Array.isArray(json)) {
         allRecords = json;
         localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(allRecords));
+        if (syncStatus) {
+          syncStatus.innerHTML = `<span class="inline-flex items-center text-emerald-700 font-semibold"><i class="fa-solid fa-cloud-arrow-down mr-1"></i> Live Google Sheet Data (${allRecords.length} Rows)</span>`;
+        }
       }
     } catch (e) {
-      console.warn('Could not fetch from Google Apps Script, fallback to LocalStorage:', e);
+      console.warn('Google Apps Script fetch error, loading cached data:', e);
+      if (syncStatus) {
+        syncStatus.innerHTML = `<span class="inline-flex items-center text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Google Sheet कनेक्ट नहीं हो सकी (Cached Local Data)</span>`;
+      }
+      loadLocalRecords();
     }
   } else {
+    if (syncStatus) {
+      syncStatus.innerHTML = `<span class="inline-flex items-center text-rose-700"><i class="fa-solid fa-circle-exclamation mr-1"></i> Google Sheet URL सेट नहीं है (Local Mode)</span>`;
+    }
     loadLocalRecords();
   }
 
@@ -540,7 +590,7 @@ function deleteRecord(refId) {
     updateAdminKPIs();
     renderAdminTable();
     renderBranchHistory();
-    showAlert('हटाया गया', `रिकॉर्ड ${refId} हटा दिया गया है।`, 'info');
+    showAlert('हटाया गया', `रिकॉर्ड ${refId} हटा दिया गया है। (नोट: Google Sheet से स्थायी हटाने के लिए सीधे Sheet से रो डिलीट करें)`, 'info');
   }
 }
 
@@ -634,7 +684,6 @@ function showAlert(title, message, type = 'info') {
 
   alertContainer.classList.remove('hidden');
 
-  // Auto hide after 5 seconds
   setTimeout(() => {
     dismissAlert();
   }, 5000);
@@ -643,68 +692,4 @@ function showAlert(title, message, type = 'info') {
 function dismissAlert() {
   const alertContainer = document.getElementById('statusAlert');
   if (alertContainer) alertContainer.classList.add('hidden');
-}
-
-// Demo Data to initialize if empty so user sees instant working preview
-function initDemoDataIfEmpty() {
-  const saved = localStorage.getItem(STORAGE_KEY_DATA);
-  if (!saved || JSON.parse(saved).length === 0) {
-    const demoData = [
-      {
-        refId: 'REF-20261027-1011-842',
-        timestamp: '27/10/2026, 11:20:15 am',
-        reportingDate: '2026-10-27',
-        branchCode: '1011',
-        branchName: 'Gorakhpur Main Branch',
-        scheme: 'JLG (Joint Liability Group) Financing',
-        targetAmount: 50,
-        achievementAmount: 52,
-        achievementPercentage: '104.00%',
-        measurementUnit: 'Amount in ₹ Lakhs',
-        officerName: 'Rahul Verma',
-        officerDesignation: 'Branch Manager',
-        officerPhone: '9876543210',
-        remarks: 'Exceeded target for October special drive'
-      },
-      {
-        refId: 'REF-20261027-1024-315',
-        timestamp: '27/10/2026, 12:45:00 pm',
-        reportingDate: '2026-10-27',
-        branchCode: '1024',
-        branchName: 'Lucknow Hazratganj',
-        scheme: 'CASA / Current & Savings Deposits',
-        targetAmount: 100,
-        achievementAmount: 94.5,
-        achievementPercentage: '94.50%',
-        measurementUnit: 'Amount in ₹ Lakhs',
-        officerName: 'Pooja Tiwari',
-        officerDesignation: 'Credit Officer / Field Officer',
-        officerPhone: '9811223344',
-        remarks: 'Salary account drive conducted successfully'
-      },
-      {
-        refId: 'REF-20261027-1055-620',
-        timestamp: '27/10/2026, 02:10:30 pm',
-        reportingDate: '2026-10-27',
-        branchCode: '1055',
-        branchName: 'Varanasi Cantt',
-        scheme: 'Social Security (PMJJBY / PMSBY / APY)',
-        targetAmount: 500,
-        achievementAmount: 480,
-        achievementPercentage: '96.00%',
-        measurementUnit: 'No. of Beneficiaries',
-        officerName: 'Sanjay Mishra',
-        officerDesignation: 'Branch Manager',
-        officerPhone: '9933445566',
-        remarks: 'Camps organized at 3 Gram Panchayats'
-      }
-    ];
-    allRecords = demoData;
-    filteredRecords = [...allRecords];
-    currentDeviceSubmissions = [...allRecords];
-    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(demoData));
-    renderBranchHistory();
-    updateAdminKPIs();
-    renderAdminTable();
-  }
 }
