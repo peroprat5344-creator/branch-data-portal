@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Branch Reporting Portal - Target & Achievement</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS for Excel Export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bank: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#1e40af',
+              600: '#1d4ed8',
+              700: '#1e3a8a',
+              800: '#172554',
+              accent: '#f97316'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Smooth mobile scrolling */
+    html { -webkit-tap-highlight-color: transparent; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+    }
+    @media print {
+      body * { visibility: hidden; }
+      #printableReceipt, #printableReceipt * { visibility: visible; }
+      #printableReceipt { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col font-sans">
+
+  <!-- Top Header Navigation -->
+  <header class="bg-gradient-to-r from-bank-800 via-bank-700 to-bank-600 text-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div class="flex items-center justify-between">
+        
+        <!-- Bank / Portal Branding -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 text-bank-accent shadow-inner">
+            <i class="fa-solid fa-building-columns text-xl"></i>
+          </div>
+          <div>
+            <h1 class="text-lg sm:text-xl font-bold tracking-tight leading-tight">Branch Reporting Portal</h1>
+            <p class="text-xs text-blue-200">Target & Achievement Monitoring System</p>
+          </div>
+        </div>
+
+        <!-- Navigation Switch (Branch View / Admin View) -->
+        <div class="flex items-center space-x-2">
+          <button id="navBranchBtn" onclick="switchView('branch')" class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white text-bank-800 shadow transition-all flex items-center space-x-1.5">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Branch Entry</span>
+          </button>
+          <button id="navAdminBtn" onclick="switchView('admin')" class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all flex items-center space-x-1.5 border border-white/10">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>Admin Portal</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Banner -->
+  <div id="statusAlert" class="hidden max-w-4xl mx-auto w-full px-4 pt-4 transition-all">
+    <div id="statusAlertBox" class="p-4 rounded-xl flex items-start space-x-3 shadow-md border text-sm">
+      <div id="statusAlertIcon" class="text-lg"></div>
+      <div class="flex-1">
+        <div id="statusAlertTitle" class="font-bold"></div>
+        <div id="statusAlertMessage" class="text-xs sm:text-sm mt-0.5"></div>
+      </div>
+      <button onclick="dismissAlert()" class="text-slate-400 hover:text-slate-600">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- ==================== 1. BRANCH ENTRY VIEW ==================== -->
+    <section id="branchView" class="space-y-6">
+      
+      <!-- Welcome & Instructions Card -->
+      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/70 rounded-2xl p-4 sm:p-5 shadow-sm">
+        <div class="flex items-start justify-between">
+          <div class="flex items-start space-x-3">
+            <div class="p-2.5 bg-blue-600 text-white rounded-xl shadow-md mt-0.5">
+              <i class="fa-solid fa-file-circle-check text-lg"></i>
+            </div>
+            <div>
+              <h2 class="text-base sm:text-lg font-bold text-bank-800">शाखा डेटा प्रविष्टि (Branch Data Entry Form)</h2>
+              <p class="text-xs sm:text-sm text-slate-600 mt-0.5">
+                अपनी शाखा का कोड चुनें और Target vs Achievement का सही डेटा भरें। यह सीधे केंद्रीय Google Sheet में सुरक्षित सेव होता है।
+              </p>
+            </div>
+          </div>
+          <!-- Live Sync Indicator -->
+          <span id="backendBadge" class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Google Sheet Live
+          </span>
+        </div>
+      </div>
+
+      <!-- Main Form -->
+      <form id="branchDataForm" onsubmit="handleBranchSubmit(event)" class="bg-white rounded-2xl shadow-md border border-slate-200/80 p-5 sm:p-8 space-y-6">
+        
+        <!-- SECTION 1: Branch & Report Identification -->
+        <div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-bank-600 mb-4 flex items-center">
+            <i class="fa-solid fa-landmark mr-2"></i> 1. शाखा एवं रिपोर्ट विवरण (Branch & Reporting Info)
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            
+            <!-- Branch Code -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                शाखा कोड (Branch Code) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <i class="fa-solid fa-hashtag text-xs"></i>
+                </span>
+                <input type="text" id="branchCode" required placeholder="उदा. 1042 / UP012"
+                  class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none uppercase font-mono transition-all">
+              </div>
+            </div>
+
+            <!-- Branch Name -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                शाखा का नाम (Branch Name) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <i class="fa-solid fa-shop text-xs"></i>
+                </span>
+                <input type="text" id="branchName" required placeholder="उदा. Gorakhpur Main / Lucknow Civil Lines"
+                  class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+              </div>
+            </div>
+
+            <!-- Reporting Date -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                रिपोर्ट दिनांक (Reporting Date) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <i class="fa-regular fa-calendar-days text-xs"></i>
+                </span>
+                <input type="date" id="reportingDate" required
+                  class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <hr class="border-slate-200">
+
+        <!-- SECTION 2: Target & Achievement Category -->
+        <div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-bank-600 mb-4 flex items-center">
+            <i class="fa-solid fa-bullseye mr-2"></i> 2. योजना / मद एवं उपलब्धि (Scheme / Target & Achievement)
+          </h3>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            
+            <!-- Category / Scheme -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                योजना / मद (Category / Scheme) <span class="text-rose-500">*</span>
+              </label>
+              <select id="schemeCategory" required onchange="handleCategoryChange()"
+                class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+                <option value="">-- योजना चुनें --</option>
+                <option value="JLG (Joint Liability Group) Financing">JLG (Joint Liability Group) Financing</option>
+                <option value="KCC (Kisan Credit Card) Fresh/Renewal">KCC (Kisan Credit Card) Fresh/Renewal</option>
+                <option value="SHG (Self Help Group) Linkage">SHG (Self Help Group) Linkage</option>
+                <option value="CASA / Current & Savings Deposits">CASA / Current & Savings Deposits</option>
+                <option value="NPA Recovery / OTS Collection">NPA Recovery / OTS Collection</option>
+                <option value="Social Security (PMJJBY / PMSBY / APY)">Social Security (PMJJBY / PMSBY / APY)</option>
+                <option value="Digital Banking / Mobile Banking Activation">Digital Banking / Mobile Banking Activation</option>
+                <option value="MSME / Mudra Loans">MSME / Mudra Loans</option>
+                <option value="Other">अन्य (Other Scheme / Campaign)</option>
+              </select>
+            </div>
+
+            <!-- Target Assigned -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                आवंटित लक्ष्य (Target Assigned) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <input type="number" step="any" min="0" id="targetAmount" required placeholder="0.00" oninput="calculateAchievementPercentage()"
+                  class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all font-mono font-semibold">
+                <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-slate-400 font-semibold">
+                  (संख्या/राशि)
+                </span>
+              </div>
+            </div>
+
+            <!-- Achievement / Actual -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                वास्तविक उपलब्धि (Actual Achievement) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <input type="number" step="any" min="0" id="achievementAmount" required placeholder="0.00" oninput="calculateAchievementPercentage()"
+                  class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all font-mono font-semibold">
+                <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-slate-400 font-semibold">
+                  (संख्या/राशि)
+                </span>
+              </div>
+            </div>
+
+            <!-- Calculated Percentage -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                उपलब्धि प्रतिशत (% Achievement)
+              </label>
+              <div class="flex items-center space-x-2">
+                <input type="text" id="achievementPercentage" readonly value="0.00%"
+                  class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-100 font-mono font-bold text-slate-700 outline-none">
+                <div id="achievementBadge" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-200 text-slate-700 whitespace-nowrap">
+                  Pending
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Unit Specification (in Lakhs / Count / Accounts) -->
+          <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                मापक इकाई (Unit of Measurement)
+              </label>
+              <select id="measurementUnit"
+                class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+                <option value="Amount in ₹ Lakhs">Amount in ₹ Lakhs (लाख रुपये में)</option>
+                <option value="Amount in ₹ Actual">Amount in ₹ Actual (वास्तविक रुपये में)</option>
+                <option value="No. of Accounts / Groups">No. of Accounts / Groups (खातों / समूहों की संख्या)</option>
+                <option value="No. of Customers / Beneficiaries">No. of Beneficiaries (लाभार्थियों की संख्या)</option>
+              </select>
+            </div>
+            
+            <!-- Custom scheme name if "Other" is selected -->
+            <div id="customSchemeDiv" class="hidden">
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                योजना का नाम लिखें (Specify Custom Scheme) <span class="text-rose-500">*</span>
+              </label>
+              <input type="text" id="customSchemeName" placeholder="उदा. Special Campaign / Kanya Sumangala"
+                class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-slate-200">
+
+        <!-- SECTION 3: Officer Details & Remarks -->
+        <div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-bank-600 mb-4 flex items-center">
+            <i class="fa-solid fa-user-check mr-2"></i> 3. विवरण प्रेषक एवं टिप्पणी (Submitted By & Remarks)
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            
+            <!-- Officer Name -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                अधिकारी / प्रेषक का नाम (Officer Name) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <i class="fa-solid fa-user-tie text-xs"></i>
+                </span>
+                <input type="text" id="officerName" required placeholder="उदा. Amit Kumar Sharma"
+                  class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+              </div>
+            </div>
+
+            <!-- Designation -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                पदनाम (Designation) <span class="text-rose-500">*</span>
+              </label>
+              <select id="officerDesignation" required
+                class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all">
+                <option value="Branch Manager">Branch Manager (शाखा प्रबंधक)</option>
+                <option value="Assistant Branch Manager">Assistant Branch Manager</option>
+                <option value="Credit Officer / Field Officer">Credit / Field Officer (ऋण अधिकारी)</option>
+                <option value="Single Window Operator (SWO)">Single Window Operator (SWO / Clerk)</option>
+                <option value="Other Official">Other Official</option>
+              </select>
+            </div>
+
+            <!-- Mobile Number -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                मोबाइल नंबर (Mobile No.) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                  <i class="fa-solid fa-phone text-xs"></i>
+                </span>
+                <input type="tel" id="officerPhone" pattern="[0-9]{10}" required placeholder="10 अंकों का मोबाइल नंबर"
+                  class="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all font-mono">
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Remarks -->
+          <div class="mt-4">
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+              टिप्पणी / विशेष विवरण (Remarks / Notes - Optional)
+            </label>
+            <textarea id="remarks" rows="2" placeholder="यदि कोई विशेष समस्या या टिप्पणी हो तो यहाँ लिखें..."
+              class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none transition-all"></textarea>
+          </div>
+        </div>
+
+        <!-- Submit Button & Action -->
+        <div class="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="text-xs text-slate-500 flex items-center">
+            <i class="fa-solid fa-lock text-emerald-600 mr-2"></i>
+            डेटा सुरक्षित एन्क्रिप्टेड प्रारूप में सबमिट होता है।
+          </div>
+          <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <button type="reset" class="w-1/2 sm:w-auto px-5 py-2.5 text-sm font-semibold rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all">
+              रीसेट (Reset)
+            </button>
+            <button type="submit" id="submitBtn" class="w-1/2 sm:w-auto px-8 py-2.5 text-sm font-bold rounded-xl bg-bank-600 hover:bg-bank-700 text-white shadow-lg hover:shadow-bank-500/30 flex items-center justify-center space-x-2 transition-all">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>डेटा सबमिट करें (Submit Data)</span>
+            </button>
+          </div>
+        </div>
+
+      </form>
+
+      <!-- Local Branch History (Only shows recent entries from this device) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h4 class="text-sm font-bold text-slate-800 flex items-center">
+            <i class="fa-solid fa-clock-rotate-left text-bank-600 mr-2"></i> इस डिवाइस से हालिया सबमिशन (Recent Submissions on this Device)
+          </h4>
+          <span id="localSubCount" class="text-xs bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">0 entries</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 border-b">
+              <tr>
+                <th class="py-2.5 px-3">Ref ID</th>
+                <th class="py-2.5 px-3">दिनांक (Date)</th>
+                <th class="py-2.5 px-3">शाखा (Branch)</th>
+                <th class="py-2.5 px-3">योजना (Scheme)</th>
+                <th class="py-2.5 px-3 text-right">Target</th>
+                <th class="py-2.5 px-3 text-right">Achieved</th>
+                <th class="py-2.5 px-3 text-center">% Achieved</th>
+                <th class="py-2.5 px-3 text-center">रसीद (Slip)</th>
+              </tr>
+            </thead>
+            <tbody id="branchHistoryTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="8" class="text-center py-6 text-slate-400">
+                  अभी तक कोई स्थानीय सबमिशन नहीं है। फॉर्म भरकर सबमिट करें।
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 2. ADMIN PORTAL VIEW ==================== -->
+    <section id="adminView" class="hidden space-y-6">
+
+      <!-- Admin Login Overlay if not authenticated -->
+      <div id="adminLoginCard" class="max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 sm:p-8 mt-6">
+        <div class="text-center mb-6">
+          <div class="w-14 h-14 bg-bank-50 text-bank-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+            <i class="fa-solid fa-user-shield text-2xl"></i>
+          </div>
+          <h2 class="text-xl font-bold text-slate-800">Admin Login</h2>
+          <p class="text-xs text-slate-500 mt-1">शाखाओं द्वारा भेजे गए डेटा और Excel डाउनलोड के लिए लॉगिन करें</p>
+        </div>
+
+        <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Admin Security PIN / Password</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                <i class="fa-solid fa-key text-xs"></i>
+              </span>
+              <input type="password" id="adminPinInput" required placeholder="Default PIN: 1234"
+                class="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 focus:border-bank-500 outline-none tracking-widest font-mono">
+              <button type="button" onclick="togglePinVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+                <i id="pinToggleIcon" class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">शुरुआती डिफॉल्ट पिन: <strong>1234</strong> (सेटिंग्स में बदल सकते हैं)</p>
+          </div>
+
+          <button type="submit" class="w-full py-2.5 text-sm font-bold rounded-xl bg-bank-600 hover:bg-bank-700 text-white shadow-md transition-all flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            <span>Login to Dashboard</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Admin Dashboard (Visible after login) -->
+      <div id="adminDashboardContent" class="hidden space-y-6">
+
+        <!-- Admin Action Bar -->
+        <div class="glass-card rounded-2xl p-4 border border-slate-200/80 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-bank-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div>
+              <h2 class="text-base sm:text-lg font-bold text-slate-800">Admin Control Center</h2>
+              <p class="text-xs text-slate-500">सभी शाखाओं की रिपोर्ट और डेटा विश्लेषण</p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2.5 flex-wrap gap-2">
+            <!-- Google Sheet Direct Link -->
+            <button onclick="openGoogleSheet()" id="openSheetBtn" class="px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 flex items-center space-x-1.5 transition-all">
+              <i class="fa-solid fa-table text-emerald-600"></i>
+              <span>Open Google Sheet</span>
+            </button>
+
+            <!-- Refresh Data -->
+            <button onclick="loadAdminData()" class="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center space-x-1.5 transition-all">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Refresh</span>
+            </button>
+
+            <!-- Export to Excel (.xlsx) -->
+            <button onclick="exportToExcel()" class="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow flex items-center space-x-1.5 transition-all">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>Export to Excel (.xlsx)</span>
+            </button>
+
+            <!-- Settings / Configure Google Sheet -->
+            <button onclick="openSettingsModal()" class="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center space-x-1.5 transition-all" title="Setup Google Sheets URL">
+              <i class="fa-solid fa-gear"></i>
+              <span>Settings</span>
+            </button>
+
+            <!-- Logout -->
+            <button onclick="adminLogout()" class="px-3 py-2 text-xs font-semibold rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all flex items-center space-x-1">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Metrics Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">कुल रिपोर्ट्स (Entries)</span>
+              <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-clipboard-list"></i>
+              </span>
+            </div>
+            <div id="statTotalSubmissions" class="text-2xl sm:text-3xl font-extrabold text-slate-800 mt-2 font-mono">0</div>
+            <p class="text-[11px] text-slate-500 mt-1">सबमिट किए गए कुल फॉर्म</p>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">सक्रिय शाखाएं (Branches)</span>
+              <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-code-branch"></i>
+              </span>
+            </div>
+            <div id="statActiveBranches" class="text-2xl sm:text-3xl font-extrabold text-slate-800 mt-2 font-mono">0</div>
+            <p class="text-[11px] text-slate-500 mt-1">Unique Reporting Branches</p>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">कुल लक्ष्य (Total Target)</span>
+              <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-bullseye"></i>
+              </span>
+            </div>
+            <div id="statTotalTarget" class="text-2xl sm:text-3xl font-extrabold text-slate-800 mt-2 font-mono">0.00</div>
+            <p class="text-[11px] text-slate-500 mt-1">कुल आवंटित लक्ष्य</p>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">कुल उपलब्धि (% Achieved)</span>
+              <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-percent"></i>
+              </span>
+            </div>
+            <div id="statTotalAchievement" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-2 font-mono">0.00%</div>
+            <p class="text-[11px] text-slate-500 mt-1">समग्र प्रदर्शन दर (Overall %)</p>
+          </div>
+
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <!-- Search Text -->
+            <div class="relative sm:col-span-2">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+              </span>
+              <input type="text" id="adminSearchQuery" oninput="filterAdminTable()" placeholder="शाखा कोड, नाम, अधिकारी या Ref ID से खोजें..."
+                class="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 outline-none">
+            </div>
+
+            <!-- Filter by Scheme -->
+            <div>
+              <select id="adminFilterScheme" onchange="filterAdminTable()"
+                class="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-bank-500 outline-none">
+                <option value="">सभी योजनाएं (All Schemes)</option>
+                <option value="JLG (Joint Liability Group) Financing">JLG Financing</option>
+                <option value="KCC (Kisan Credit Card) Fresh/Renewal">KCC</option>
+                <option value="SHG (Self Help Group) Linkage">SHG Linkage</option>
+                <option value="CASA / Current & Savings Deposits">CASA Deposits</option>
+                <option value="NPA Recovery / OTS Collection">NPA Recovery</option>
+                <option value="Social Security (PMJJBY / PMSBY / APY)">Social Security</option>
+                <option value="Digital Banking / Mobile Banking Activation">Digital Banking</option>
+                <option value="MSME / Mudra Loans">MSME Loans</option>
+                <option value="Other">अन्य (Other)</option>
+              </select>
+            </div>
+
+            <!-- Clear Filter Button -->
+            <div class="flex items-center space-x-2">
+              <button onclick="resetAdminFilters()" class="w-full py-2 text-xs font-semibold rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50">
+                फ़िल्टर साफ़ करें (Reset)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Data Table -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center">
+              <i class="fa-solid fa-table-list text-bank-600 mr-2"></i> शाखा-वार सबमिशन रिकॉर्ड्स (Branch Submission Records)
+            </h3>
+            <span id="filteredCountBadge" class="text-xs bg-bank-50 text-bank-700 font-semibold px-2.5 py-1 rounded-full border border-bank-200">
+              Showing 0 records
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 text-slate-600 uppercase tracking-wider font-semibold border-b">
+                <tr>
+                  <th class="py-3 px-3.5">Ref ID</th>
+                  <th class="py-3 px-3.5">दिनांक</th>
+                  <th class="py-3 px-3.5">शाखा कोड</th>
+                  <th class="py-3 px-3.5">शाखा का नाम</th>
+                  <th class="py-3 px-3.5">योजना / मद</th>
+                  <th class="py-3 px-3.5 text-right">लक्ष्य (Target)</th>
+                  <th class="py-3 px-3.5 text-right">उपलब्धि (Ach.)</th>
+                  <th class="py-3 px-3.5 text-center">% Achieved</th>
+                  <th class="py-3 px-3.5">अधिकारी विवरण</th>
+                  <th class="py-3 px-3.5">टिप्पणी</th>
+                  <th class="py-3 px-3.5 text-center">एक्शन</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody" class="divide-y divide-slate-100 font-normal text-slate-700">
+                <tr>
+                  <td colspan="11" class="text-center py-10 text-slate-400">
+                    डेटा लोड हो रहा है या अभी कोई रिकॉर्ड मौजूद नहीं है...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ==================== ACKNOWLEDGEMENT / RECEIPT MODAL ==================== -->
+  <div id="receiptModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Close button -->
+      <button onclick="closeReceiptModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div id="printableReceipt" class="space-y-4">
+        <!-- Success Header -->
+        <div class="text-center">
+          <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2 text-2xl">
+            <i class="fa-solid fa-check"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-800">डेटा सफलतापूर्वक सबमिट हुआ!</h3>
+          <p class="text-xs text-slate-500">Branch Submission Acknowledgement Slip</p>
+        </div>
+
+        <!-- Receipt Details Box -->
+        <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2 text-xs">
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">Reference ID:</span>
+            <span id="receiptRefId" class="font-mono font-bold text-bank-700"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">दिनांक (Date & Time):</span>
+            <span id="receiptTimestamp" class="font-semibold text-slate-800"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">शाखा (Branch):</span>
+            <span id="receiptBranch" class="font-bold text-slate-800"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">योजना (Scheme):</span>
+            <span id="receiptScheme" class="font-semibold text-slate-800"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">आवंटित लक्ष्य (Target):</span>
+            <span id="receiptTarget" class="font-mono font-bold text-slate-800"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">उपलब्धि (Achievement):</span>
+            <span id="receiptAchievement" class="font-mono font-bold text-emerald-700"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-200">
+            <span class="text-slate-500">प्रतिशत (% Achieved):</span>
+            <span id="receiptPercentage" class="font-mono font-bold text-emerald-700"></span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span class="text-slate-500">प्रस्तुतकर्ता (Officer):</span>
+            <span id="receiptOfficer" class="font-semibold text-slate-800"></span>
+          </div>
+        </div>
+
+        <!-- Print & Done Buttons -->
+        <div class="flex items-center space-x-3 pt-2">
+          <button onclick="window.print()" class="w-1/2 py-2.5 text-xs font-bold rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-print"></i>
+            <span>रसीद प्रिंट करें (Print)</span>
+          </button>
+          <button onclick="closeReceiptModal()" class="w-1/2 py-2.5 text-xs font-bold rounded-xl bg-bank-600 hover:bg-bank-700 text-white shadow flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>ठीक है (OK)</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== GOOGLE SHEET SETTINGS MODAL ==================== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative">
+      
+      <button onclick="closeSettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="space-y-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-gear"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-800">Google Sheets Integration Settings</h3>
+            <p class="text-xs text-slate-500">अपनी Google Sheet को इस पोर्टल से कनेक्ट करें</p>
+          </div>
+        </div>
+
+        <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
+          <strong>कैसे सेट करें?</strong> हमने आपके लिए <code class="bg-white px-1 py-0.5 rounded font-mono">google-apps-script.js</code> फ़ाइल तैयार की है। बस उसे अपनी Google Sheet में पेस्ट करके Web App deploy करें और URL नीचे डालें।
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Google Apps Script Web App URL:
+          </label>
+          <input type="url" id="googleScriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec"
+            class="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 outline-none font-mono">
+          <p class="text-[11px] text-slate-400 mt-1">यदि खाली छोड़ेंगे, तो पोर्टल आपके ब्राउज़र के LocalStorage में सुरक्षित काम करेगा।</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Google Sheet View Link (Optional - for quick opening):
+          </label>
+          <input type="url" id="googleSheetViewUrlInput" placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+            class="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 outline-none font-mono">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Admin PIN बदलें (Change Admin PIN):
+          </label>
+          <input type="password" id="newAdminPinInput" placeholder="नया 4-अंकीय पिन" maxlength="10"
+            class="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-bank-500 outline-none font-mono">
+        </div>
+
+        <div class="flex items-center space-x-3 pt-3">
+          <button onclick="closeSettingsModal()" class="w-1/2 py-2 text-xs font-semibold rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button onclick="saveSettings()" class="w-1/2 py-2 text-xs font-bold rounded-xl bg-bank-600 hover:bg-bank-700 text-white shadow">
+            Save Settings
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+        <span>Bank Branch Data Management & Target Monitoring Portal</span>
+      </div>
+      <div>
+        <span>Designed for Mobile & Computer Web Browsers</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic JS -->
+  <script src="app.js"></script>
+</body>
+</html>
